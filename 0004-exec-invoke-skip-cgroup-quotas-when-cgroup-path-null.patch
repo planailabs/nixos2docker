@@ -1,0 +1,15 @@
+--- a/src/core/exec-invoke.c	2026-05-15 00:27:05.176841480 +0200
++++ b/src/core/exec-invoke.c	2026-05-15 00:27:05.221836486 +0200
+@@ -3240,8 +3240,10 @@
+                                 goto fail;
+                 }
+ 
+-                /* Apply storage quotas and accounting */
+-                r = apply_exec_quotas(target_dir, params->cgroup_path, type, &context->directories[type].exec_quota, &exec_dt_proj_id, &quota_already_enforced);
++                /* Apply storage quotas and accounting (skip in containers without cgroup) */
++                r = params->cgroup_path ?
++                        apply_exec_quotas(target_dir, params->cgroup_path, type, &context->directories[type].exec_quota, &exec_dt_proj_id, &quota_already_enforced) :
++                        0;
+                 if (r < 0)
+                         goto fail;
+         }

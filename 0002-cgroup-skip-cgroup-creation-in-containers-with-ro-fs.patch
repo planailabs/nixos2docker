@@ -1,5 +1,5 @@
---- a/src/core/cgroup.c	2026-05-14 23:47:10.187193431 +0200
-+++ b/src/core/cgroup.c	2026-05-14 23:47:10.228281625 +0200
+--- a/src/core/cgroup.c	2026-05-15 00:06:49.516889560 +0200
++++ b/src/core/cgroup.c	2026-05-15 00:06:49.556719844 +0200
 @@ -2084,8 +2084,13 @@
  
          /* First, create our own group */
@@ -15,21 +15,40 @@
          created = r;
  
          if (set_path) {
-@@ -2548,10 +2553,11 @@
+@@ -2097,7 +2102,9 @@
+                 assert(r > 0);
+         }
+ 
+-        CGroupRuntime *crt = ASSERT_PTR(unit_get_cgroup_runtime(u));
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        if (!crt)
++                return 0; /* No cgroup runtime — running in container with ro cgroup fs */
+ 
+         uint64_t cgroup_id = 0;
+         r = cg_get_path(crt->cgroup_path, /* suffix= */ NULL, &cgroup_full_path);
+@@ -2195,7 +2202,9 @@
          if (r < 0)
                  return r;
  
 -        CGroupRuntime *crt = ASSERT_PTR(unit_get_cgroup_runtime(u));
 +        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        if (!crt)
++                return 0; /* No cgroup runtime — running in container with ro cgroup fs */
+ 
+         if (isempty(suffix_path))
+                 p = empty_to_root(crt->cgroup_path);
+@@ -2548,7 +2557,9 @@
+         if (r < 0)
+                 return r;
+ 
+-        CGroupRuntime *crt = ASSERT_PTR(unit_get_cgroup_runtime(u));
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
++        if (!crt)
++                return 0; /* No cgroup runtime — running in container with ro cgroup fs */
  
          /* Now, reset the invalidation mask */
--        crt->cgroup_invalidated_mask = 0;
-+        if (crt)
-+                crt->cgroup_invalidated_mask = 0;
-         return 0;
- }
- 
-@@ -3320,8 +3326,12 @@
+         crt->cgroup_invalidated_mask = 0;
+@@ -3320,8 +3331,12 @@
                  if (r < 0)
                          log_warning_errno(r, "Couldn't move remaining userspace processes, ignoring: %m");
  
