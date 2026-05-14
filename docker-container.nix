@@ -25,18 +25,14 @@ in
   #  Patch systemd: gracefully degrade on read-only cgroup filesystem
   # ════════════════════════════════════════════════════════════════════
 
-  nixpkgs.overlays = [
-    (final: prev: {
-      systemd = prev.systemd.overrideAttrs (old: {
-        patches = (old.patches or []) ++ [
-          ./0001-mount-setup-skip-writable-check-in-containers.patch
-          ./0002-cgroup-skip-cgroup-creation-in-containers-with-ro-fs.patch
-          ./0003-main-keep-console-logging-in-containers.patch
-          ./0004-exec-invoke-skip-cgroup-quotas-when-cgroup-path-null.patch
-        ];
-      });
-    })
-  ];
+  systemd.package = pkgs.systemd.overrideAttrs (old: {
+    patches = (old.patches or []) ++ [
+      ./0001-mount-setup-skip-writable-check-in-containers.patch
+      ./0002-cgroup-skip-cgroup-creation-in-containers-with-ro-fs.patch
+      ./0003-main-keep-console-logging-in-containers.patch
+      ./0004-exec-invoke-skip-cgroup-quotas-when-cgroup-path-null.patch
+    ];
+  });
 
   # ════════════════════════════════════════════════════════════════════
   #  Core container identity
