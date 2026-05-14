@@ -1,0 +1,41 @@
+--- a/src/core/main.c	2026-05-14 23:28:24.569129571 +0200
++++ b/src/core/main.c	2026-05-14 23:28:24.616648729 +0200
+@@ -3156,8 +3156,9 @@
+                         /* Running inside a container, as PID 1 */
+                         log_set_target_and_open(LOG_TARGET_CONSOLE);
+ 
+-                        /* For later on, see above... */
+-                        log_set_target(LOG_TARGET_JOURNAL);
++                        /* In containers, keep logging to console (stdout/stderr) so the
++                         * container runtime can capture all output.  Don't switch to journal. */
++                        log_set_target(LOG_TARGET_CONSOLE);
+ 
+                         /* clear the kernel timestamp, because we are in a container */
+                         kernel_timestamp = DUAL_TIMESTAMP_NULL;
+@@ -3178,9 +3179,11 @@
+                  * instances since they never log into the console. */
+                 log_show_color(colors_enabled());
+ 
+-                r = make_null_stdio();
+-                if (r < 0)
+-                        log_warning_errno(r, "Failed to redirect standard streams to /dev/null, ignoring: %m");
++                if (detect_container() <= 0) {
++                        r = make_null_stdio();
++                        if (r < 0)
++                                log_warning_errno(r, "Failed to redirect standard streams to /dev/null, ignoring: %m");
++                }
+ 
+                 /* Load the kernel modules early. */
+                 if (!skip_setup)
+@@ -3199,7 +3202,10 @@
+                 /* Running as user instance */
+                 arg_runtime_scope = RUNTIME_SCOPE_USER;
+                 log_set_always_reopen_console(true);
+-                log_set_target_and_open(LOG_TARGET_AUTO);
++                if (detect_container() > 0)
++                        log_set_target_and_open(LOG_TARGET_CONSOLE);
++                else
++                        log_set_target_and_open(LOG_TARGET_AUTO);
+ 
+                 /* clear the kernel timestamp, because we are not PID 1 */
+                 kernel_timestamp = DUAL_TIMESTAMP_NULL;

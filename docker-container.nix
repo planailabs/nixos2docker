@@ -31,6 +31,7 @@ in
         patches = (old.patches or []) ++ [
           ./0001-mount-setup-skip-writable-check-in-containers.patch
           ./0002-cgroup-skip-cgroup-creation-in-containers-with-ro-fs.patch
+          ./0003-main-keep-console-logging-in-containers.patch
         ];
       });
     })

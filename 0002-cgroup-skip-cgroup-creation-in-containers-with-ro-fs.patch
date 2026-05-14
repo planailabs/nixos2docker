@@ -1,5 +1,5 @@
---- a/src/core/cgroup.c	2026-05-14 23:05:13.192596949 +0200
-+++ b/src/core/cgroup.c	2026-05-14 23:05:27.966918757 +0200
+--- a/src/core/cgroup.c	2026-05-14 23:47:10.187193431 +0200
++++ b/src/core/cgroup.c	2026-05-14 23:47:10.228281625 +0200
 @@ -2084,8 +2084,13 @@
  
          /* First, create our own group */
@@ -15,7 +15,21 @@
          created = r;
  
          if (set_path) {
-@@ -3320,8 +3325,12 @@
+@@ -2548,10 +2553,11 @@
+         if (r < 0)
+                 return r;
+ 
+-        CGroupRuntime *crt = ASSERT_PTR(unit_get_cgroup_runtime(u));
++        CGroupRuntime *crt = unit_get_cgroup_runtime(u);
+ 
+         /* Now, reset the invalidation mask */
+-        crt->cgroup_invalidated_mask = 0;
++        if (crt)
++                crt->cgroup_invalidated_mask = 0;
+         return 0;
+ }
+ 
+@@ -3320,8 +3326,12 @@
                  if (r < 0)
                          log_warning_errno(r, "Couldn't move remaining userspace processes, ignoring: %m");
  
