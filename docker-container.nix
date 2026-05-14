@@ -5,39 +5,64 @@
 # into the Docker variant via extendModules. All config here only
 # affects config.system.build.dockerImage, never the base system.
 #
+# The image runs with ZERO extra capabilities — no --privileged,
+# no --cap-add SYS_ADMIN.  The approach mirrors how Incus (LXC)
+# runs unprivileged system containers: rely on cgroup namespaces
+# for delegation, set $container so systemd auto-detects its
+# environment, and disable everything that would need CAP_SYS_ADMIN.
 
 { config, lib, pkgs, ... }:
 
 let
   inherit (lib) mkForce mkDefault;
 
-  # Read image settings from the *base* config (passed through by extendModules).
-  # These options are declared in build-docker-image.nix.
   imgCfg = config.virtualisation.dockerImage;
   toplevel = config.system.build.toplevel;
 
 in
 {
   # ════════════════════════════════════════════════════════════════════
-  #  systemd / container tweaks — only exist inside the variant
+  #  Core container identity
   # ════════════════════════════════════════════════════════════════════
 
-  # ── Boot ─────────────────────────────────────────────────────────
+  # boot.isContainer = true activates container-config.nix which
+  # disables: kernel, modprobe, console, udev, lvm, audit.
   boot.isContainer = true;
+  boot.initrd.systemd.enable = true;
+
+  # Tell NixOS that /proc, /run, /dev, /dev/shm, /dev/pts are
+  # already provided by Docker — do not attempt to mount them.
+  # (Without this, the specialfs activation script tries to mount
+  # them and fails without CAP_SYS_ADMIN.)
+  boot.specialFileSystems = mkForce { };
+
+  # Do not attempt to bind-mount /nix/store with ro/nosuid/nodev
+  # options — the remount requires CAP_SYS_ADMIN.  The store is
+  # already immutable inside the image layers.
+  boot.nixStoreMountOpts = [ ];
+
   boot.loader.grub.enable = false;
   boot.loader.systemd-boot.enable = mkForce false;
   boot.tmp.useTmpfs = true;
 
-  # ── Filesystem ───────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════
+  #  Filesystem
+  # ════════════════════════════════════════════════════════════════════
+
   fileSystems."/" = mkForce {
     device = "none";
     fsType = "tmpfs";
   };
 
-  # ── Security ─────────────────────────────────────────────────────
-  security.audit.enable = false;
+  # ════════════════════════════════════════════════════════════════════
+  #  Environment — systemd container interface
+  # ════════════════════════════════════════════════════════════════════
 
-  # ── Environment ──────────────────────────────────────────────────
+  # The $container variable is the primary mechanism by which systemd
+  # detects it is running in a container (see systemd.io/CONTAINER_INTERFACE).
+  # When set, systemd skips hardware init, avoids bind-mount-based
+  # sandboxing (ProtectSystem, ProtectHome, etc.), and degrades
+  # gracefully when privileged operations are unavailable.
   environment.variables.container = "docker";
 
   environment.etc."machine-id" = {
@@ -45,19 +70,60 @@ in
     mode = "0444";
   };
 
-  # ── systemd ──────────────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════
+  #  systemd
+  # ════════════════════════════════════════════════════════════════════
+
   systemd.defaultUnit = "multi-user.target";
   systemd.enableEmergencyMode = false;
 
-  # ── Journald ─────────────────────────────────────────────────────
+  # Disable seccomp-based sandboxing inside the container — the
+  # kernel already enforces container boundaries via namespaces.
+  # Without this, systemd 253+ services with sandboxing directives
+  # may fail when they cannot set up seccomp filters.
+  systemd.settings.Manager.DefaultEnvironment = "SYSTEMD_SECCOMP=0";
+
+  # Prevent systemd from trying to enable cgroup controllers it
+  # cannot manage without CAP_SYS_ADMIN.  See:
+  # https://github.com/systemd/systemd/pull/10567
+  # https://github.com/systemd/systemd/pull/7630
+  systemd.slices."-.slice".sliceConfig.DisableControllers = [
+    "cpu" "cpuset" "io" "memory" "pids"
+  ];
+
+  # ════════════════════════════════════════════════════════════════════
+  #  Services — use proper NixOS options to disable
+  # ════════════════════════════════════════════════════════════════════
+
+  # boot.isContainer already sets services.udev.enable = false
+  # and security.audit.enable = false in container-config.nix.
+  # Explicitly disable remaining services that have NixOS options:
+
+  services.resolved.enable = false;
+  services.timesyncd.enable = mkForce false;
+  services.nscd.enable = false;
+  system.nssModules = mkForce [ ];
+
+  # systemd-oomd needs CAP_SYS_ADMIN for cgroup pressure monitoring
+  systemd.oomd.enable = false;
+
+  # The suid wrappers mount needs CAP_SYS_ADMIN; disable it.
+  security.wrappers = mkForce { };
+  systemd.mounts = [{
+    where = "/run/wrappers";
+    enable = false;
+  }];
+  services.journald.storage = "volatile";
+  services.journald.console = "/dev/console";
   services.journald.extraConfig = ''
-    Storage=volatile
     ForwardToConsole=yes
     MaxLevelConsole=info
   '';
 
-  # ── Networking ───────────────────────────────────────────────────
-  # Docker handles networking; disable the NixOS networking stack.
+  # ════════════════════════════════════════════════════════════════════
+  #  Networking — Docker manages the network stack
+  # ════════════════════════════════════════════════════════════════════
+
   networking.useDHCP = mkForce false;
   networking.useNetworkd = mkForce false;
   networking.firewall.enable = mkForce false;
@@ -66,10 +132,17 @@ in
     "::1"       = [ "localhost" ];
   };
 
-  # ── Root user (sensible default for containers) ──────────────────
+  # ════════════════════════════════════════════════════════════════════
+  #  Users
+  # ════════════════════════════════════════════════════════════════════
+
   users.users.root.initialHashedPassword = mkDefault "";
 
-  # ── Masked services ──────────────────────────────────────────────
+  # ════════════════════════════════════════════════════════════════════
+  #  Masked systemd units — services without NixOS-level options
+  #  that would fail or are pointless in an unprivileged container.
+  # ════════════════════════════════════════════════════════════════════
+
   systemd.services = let
     mkMasked = name: lib.nameValuePair name {
       enable = mkForce false;
@@ -77,25 +150,26 @@ in
       requiredBy = mkForce [ ];
     };
   in builtins.listToAttrs (map mkMasked [
-    # Hardware / device management
-    "systemd-udevd"
-    "systemd-modules-load"
+    # Hardware — no devices, no kernel, no firmware
     "systemd-sysctl"
     "systemd-random-seed"
     "systemd-rfkill"
     "systemd-hibernate-resume"
     "systemd-tmpfiles-setup-dev"
+    "systemd-binfmt"
+    "systemd-pstore"
+    "systemd-firstboot"
+    "systemd-hwdb-update"
 
     # Networking (Docker manages this)
     "systemd-networkd"
     "systemd-networkd-wait-online"
-    "systemd-resolved"
-    "systemd-timesyncd"
     "firewall"
     "network-setup"
 
-    # Filesystem / mount daemons
+    # Filesystem / mount — requires CAP_SYS_ADMIN
     "systemd-remount-fs"
+    "suid-sgid-wrappers"
 
     # Console / login / seat management
     "systemd-logind"
@@ -110,7 +184,6 @@ in
     "systemd-ask-password-wall"
   ]);
 
-  # ── Masked sockets ──────────────────────────────────────────────
   systemd.sockets = let
     mkMasked = name: lib.nameValuePair name {
       enable = mkForce false;
@@ -122,7 +195,6 @@ in
     "systemd-journald-audit"
   ]);
 
-  # ── Masked targets ──────────────────────────────────────────────
   systemd.targets = let
     mkMasked = name: lib.nameValuePair name {
       enable = mkForce false;

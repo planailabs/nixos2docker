@@ -19,12 +19,12 @@
 #   nix build .#nixosConfigurations.myHost.config.system.build.dockerImage
 #   docker load < result
 #
-#   # Run:
+#   # Run (no extra capabilities needed):
 #   docker run -d --name nixos \
 #     --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
-#     --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+#     --cgroupns=private \
+#     -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
 #     --stop-signal SIGRTMIN+3 \
-#     --cap-add SYS_ADMIN \
 #     nixos-docker:latest
 #
 #   # You can also push extra config into the variant without touching

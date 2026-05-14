@@ -60,6 +60,24 @@
         self.nixosConfigurations.${system}.config.system.build.dockerImage;
       default =
         self.packages.${system}.dockerImage;
+
+      # Test image with nginx — used by test-local.sh
+      testImage = (nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          self.nixosModules.default
+          ({ pkgs, ... }: {
+            virtualisation.dockerImage.name = "nixos-nginx-test";
+            virtualisation.dockerImage.tag = "latest";
+            services.nginx = {
+              enable = true;
+              virtualHosts."localhost".root =
+                pkgs.writeTextDir "index.html" "nixos2docker-ok";
+            };
+            system.stateVersion = "24.11";
+          })
+        ];
+      }).config.system.build.dockerImage;
     });
 
     # ── NixOS VM tests ─────────────────────────────────────────────
