@@ -48,6 +48,10 @@
             #   services.nginx.enable = true;
             # };
 
+            # Required for base NixOS evaluation (Docker variant overrides these)
+            fileSystems."/" = { device = "none"; fsType = "tmpfs"; };
+            boot.loader.grub.enable = false;
+
             system.stateVersion = "24.11";
           })
         ];
