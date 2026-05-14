@@ -150,6 +150,12 @@ in
       requiredBy = mkForce [ ];
     };
   in builtins.listToAttrs (map mkMasked [
+    # Journald — cgroup pressure monitoring fails when the cgroup
+    # namespace doesn't match the mounted filesystem.  Disable
+    # journald; container logs go to stdout via ForwardToConsole.
+    "systemd-journald"
+    "systemd-journal-flush"
+
     # Hardware — no devices, no kernel, no firmware
     "systemd-sysctl"
     "systemd-random-seed"
@@ -193,6 +199,8 @@ in
     "systemd-udevd-control"
     "systemd-udevd-kernel"
     "systemd-journald-audit"
+    "systemd-journald"
+    "systemd-journald-dev-log"
   ]);
 
   systemd.targets = let

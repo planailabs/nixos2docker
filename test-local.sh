@@ -20,7 +20,6 @@ docker load < result
 echo "==> Starting container (NO extra capabilities)..."
 docker run -d --name "$CONTAINER_NAME" \
   --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
-  --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
   --stop-signal SIGRTMIN+3 \
   -p 18080:80 \

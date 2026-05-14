@@ -22,7 +22,6 @@
 #   # Run (no extra capabilities needed):
 #   docker run -d --name nixos \
 #     --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
-#     --cgroupns=private \
 #     -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
 #     --stop-signal SIGRTMIN+3 \
 #     nixos-docker:latest

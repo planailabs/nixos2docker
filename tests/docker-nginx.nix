@@ -53,8 +53,9 @@ in
     machine.succeed("docker load < ${nginxDockerImage}")
 
     # Start the container WITHOUT any extra capabilities.
-    # The cgroup mount must be writable so systemd can manage
-    # service cgroups within its own scope.
+    # --cgroupns=host is needed in the test VM so the cgroup
+    # bind-mount is writable.  On hosts with Docker's default
+    # cgroupns=private, the bind mount alone is sufficient.
     machine.succeed(
         "docker run -d --name nixos-test "
         "--tmpfs /run --tmpfs /run/lock --tmpfs /tmp "
