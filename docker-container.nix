@@ -281,7 +281,6 @@ EOF
         "container=docker"
       ];
       Volumes = {
-        "/sys/fs/cgroup" = { };
         "/run"           = { };
         "/run/lock"      = { };
         "/tmp"           = { };
