@@ -61,5 +61,18 @@
       default =
         self.packages.${system}.dockerImage;
     });
+
+    # ── NixOS VM tests ─────────────────────────────────────────────
+    checks = forAllSystems (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in
+      {
+        docker-nginx = pkgs.testers.runNixOSTest (import ./tests/docker-nginx.nix {
+          inherit self pkgs;
+          lib = nixpkgs.lib;
+        });
+      }
+    );
   };
 }

@@ -46,7 +46,7 @@ in
   };
 
   # ── systemd ──────────────────────────────────────────────────────
-  systemd.defaultTarget = "multi-user.target";
+  systemd.defaultUnit = "multi-user.target";
   systemd.enableEmergencyMode = false;
 
   # ── Journald ─────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ in
       pkgs.less
     ] ++ imgCfg.extraContents;
 
-    extraCommands = ''
+    fakeRootCommands = ''
       # ── Nix profiles ──────────────────────────────────────────
       mkdir -p nix/var/nix/profiles nix/var/nix/gcroots
       ln -s ${toplevel} nix/var/nix/profiles/system
@@ -169,11 +169,16 @@ in
       ln -sf ${toplevel}/init sbin/init
 
       # ── Directory structure ───────────────────────────────────
+      # etc may be a symlink into the read-only nix store from
+      # contents; replace it with a real writable directory.
+      if [ -L etc ] || [ -e etc ]; then
+        rm -rf etc
+      fi
       mkdir -p etc run var tmp proc sys dev
       mkdir -p var/log/journal var/lib
 
       # ── /etc overlay from NixOS ───────────────────────────────
-      ln -sf ${config.system.build.etc}/etc etc/static
+      ln -s ${config.system.build.etc}/etc etc/static
 
       # ── Baseline passwd/group ─────────────────────────────────
       if [ ! -f etc/passwd ]; then
