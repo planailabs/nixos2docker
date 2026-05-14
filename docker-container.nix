@@ -22,6 +22,21 @@ let
 in
 {
   # ════════════════════════════════════════════════════════════════════
+  #  Patch systemd: gracefully degrade on read-only cgroup filesystem
+  # ════════════════════════════════════════════════════════════════════
+
+  nixpkgs.overlays = [
+    (final: prev: {
+      systemd = prev.systemd.overrideAttrs (old: {
+        patches = (old.patches or []) ++ [
+          ./0001-mount-setup-skip-writable-check-in-containers.patch
+          ./0002-cgroup-skip-cgroup-creation-in-containers-with-ro-fs.patch
+        ];
+      });
+    })
+  ];
+
+  # ════════════════════════════════════════════════════════════════════
   #  Core container identity
   # ════════════════════════════════════════════════════════════════════
 

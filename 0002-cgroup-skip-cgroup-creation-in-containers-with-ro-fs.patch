@@ -1,0 +1,32 @@
+--- a/src/core/cgroup.c	2026-05-14 23:05:13.192596949 +0200
++++ b/src/core/cgroup.c	2026-05-14 23:05:27.966918757 +0200
+@@ -2084,8 +2084,13 @@
+ 
+         /* First, create our own group */
+         r = cg_create(cgroup);
+-        if (r < 0)
++        if (r < 0) {
++                if (ERRNO_IS_NEG_FS_WRITE_REFUSED(r) && detect_container() > 0) {
++                        log_unit_debug_errno(u, r, "Failed to create cgroup %s (container, read-only cgroup fs), ignoring: %m", empty_to_root(cgroup));
++                        return 0;
++                }
+                 return log_unit_error_errno(u, r, "Failed to create cgroup %s: %m", empty_to_root(cgroup));
++        }
+         created = r;
+ 
+         if (set_path) {
+@@ -3320,8 +3325,12 @@
+                 if (r < 0)
+                         log_warning_errno(r, "Couldn't move remaining userspace processes, ignoring: %m");
+ 
+-        } else if (!MANAGER_IS_TEST_RUN(m))
+-                return log_error_errno(r, "Failed to create %s control group: %m", scope_path);
++        } else if (!MANAGER_IS_TEST_RUN(m)) {
++                if (detect_container() > 0)
++                        log_warning_errno(r, "Failed to create %s control group (container, read-only cgroup fs), ignoring: %m", scope_path);
++                else
++                        return log_error_errno(r, "Failed to create %s control group: %m", scope_path);
++        }
+ 
+         /* 6. Figure out which controllers are supported */
+         r = cg_mask_supported_subtree(m->cgroup_root, &m->cgroup_supported);

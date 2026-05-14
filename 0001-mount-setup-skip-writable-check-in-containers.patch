@@ -1,0 +1,25 @@
+--- a/src/shared/mount-setup.c	2026-05-14 23:05:13.188115262 +0200
++++ b/src/shared/mount-setup.c	2026-05-14 23:05:27.966053039 +0200
+@@ -333,13 +333,17 @@
+ 
+         if (FLAGS_SET(p->mode, MNT_CHECK_WRITABLE))
+                 if (access(p->where, W_OK) < 0) {
+-                        r = -errno;
++                        if (detect_container() > 0) {
++                                log_debug("Mount point '%s' not writable (container), continuing anyway.", p->where);
++                        } else {
++                                r = -errno;
+ 
+-                        (void) umount2(p->where, UMOUNT_NOFOLLOW);
+-                        (void) rmdir(p->where);
++                                (void) umount2(p->where, UMOUNT_NOFOLLOW);
++                                (void) rmdir(p->where);
+ 
+-                        log_full_errno(priority, r, "Mount point '%s' not writable after mounting, undoing: %m", p->where);
+-                        return FLAGS_SET(p->mode, MNT_FATAL) ? r : 0;
++                                log_full_errno(priority, r, "Mount point '%s' not writable after mounting, undoing: %%m", p->where);
++                                return FLAGS_SET(p->mode, MNT_FATAL) ? r : 0;
++                        }
+                 }
+ 
+         return 1;
