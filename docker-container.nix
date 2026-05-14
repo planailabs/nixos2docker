@@ -31,6 +31,7 @@ in
       ./0002-cgroup-skip-cgroup-creation-in-containers-with-ro-fs.patch
       ./0003-main-keep-console-logging-in-containers.patch
       ./0004-exec-invoke-skip-cgroup-quotas-when-cgroup-path-null.patch
+      ./0005-manager-SIGTERM-triggers-poweroff-in-containers.patch
     ];
   });
 
@@ -306,7 +307,6 @@ EOF
         "/run/lock"      = { };
         "/tmp"           = { };
       };
-      StopSignal = "SIGRTMIN+3";
       Labels = {
         "org.nixos.systemd-container" = "true";
       };

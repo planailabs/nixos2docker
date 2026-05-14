@@ -1,0 +1,21 @@
+--- a/src/core/manager.c	2026-05-15 01:42:53.021870998 +0200
++++ b/src/core/manager.c	2026-05-15 01:42:53.072344407 +0200
+@@ -2979,8 +2979,16 @@
+ 
+         case SIGTERM:
+                 if (MANAGER_IS_SYSTEM(m)) {
+-                        /* This is for compatibility with the original sysvinit */
+-                        m->objective = MANAGER_REEXECUTE;
++                        if (detect_container() > 0) {
++                                /* In containers, SIGTERM means "shut down" (sent by
++                                 * docker stop / podman stop).  Start poweroff.target
++                                 * so we get a clean shutdown without requiring the
++                                 * non-standard SIGRTMIN+3. */
++                                manager_start_special(m, SPECIAL_POWEROFF_TARGET, JOB_REPLACE_IRREVERSIBLY);
++                        } else {
++                                /* This is for compatibility with the original sysvinit */
++                                m->objective = MANAGER_REEXECUTE;
++                        }
+                         break;
+                 }
+ 

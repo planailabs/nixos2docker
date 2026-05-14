@@ -37,17 +37,16 @@ nix build .#nixosConfigurations.myHost.config.system.build.dockerImage
 # Load into Docker
 docker load < result
 
-# Run — no extra capabilities needed
+# Run — no special flags needed
 docker run -d --name nixos \
   --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
-  --stop-signal SIGRTMIN+3 \
   nixos-docker:latest
 
 # Check it's running
 docker exec -e PATH=/run/current-system/sw/bin nixos systemctl status
 ```
 
-That's it. No `--privileged`, no `--cap-add`, no `--cgroupns`, no `-v /sys/fs/cgroup`.
+That's it. No `--privileged`, no `--cap-add`, no `--cgroupns`, no `-v /sys/fs/cgroup`, no `--stop-signal`.
 
 ## How it works
 
@@ -74,6 +73,7 @@ systemd 260 hard-crashes in containers with read-only cgroup filesystems (the de
 | `0002-cgroup` | Skip `cg_create()` for init.scope and per-unit cgroups on read-only cgroup fs; replace `ASSERT_PTR` with NULL checks on `CGroupRuntime` |
 | `0003-main` | Keep stdout/stderr alive in containers (skip `make_null_stdio()`); stay on `LOG_TARGET_CONSOLE` instead of switching to journal |
 | `0004-exec-invoke` | Skip `apply_exec_quotas()` when `cgroup_path` is NULL |
+| `0005-manager` | Map SIGTERM to `poweroff.target` in containers (Docker sends SIGTERM by default; stock systemd treats it as reexec) |
 
 These patches are inspired by how [Incus/LXC](https://linuxcontainers.org/incus/) runs unprivileged system containers and the approach of the [oci-systemd-hook](https://github.com/projectatomic/oci-systemd-hook).
 
@@ -139,7 +139,7 @@ The container module applies the following, modelled on how Incus/LXD and system
 
 **Environment:** `container=docker` set so systemd auto-detects the container runtime and skips hardware init.
 
-**Stop signal:** `SIGRTMIN+3` — the correct signal for clean systemd shutdown.
+**Stop signal:** SIGTERM triggers clean shutdown via the manager patch (stock systemd requires the non-standard `SIGRTMIN+3`; our patch maps SIGTERM to `poweroff.target` in containers).
 
 ## Docker run flags
 
@@ -150,11 +150,10 @@ docker run -d \
   --tmpfs /run          # systemd needs a writable /run
   --tmpfs /run/lock     # lock files
   --tmpfs /tmp          # world-writable temp
-  --stop-signal SIGRTMIN+3  # clean systemd shutdown
   my-image:latest
 ```
 
-No `--privileged`, no `--cap-add`, no `--cgroupns`, no `-v /sys/fs/cgroup`.
+No `--privileged`, no `--cap-add`, no `--cgroupns`, no `-v /sys/fs/cgroup`, no `--stop-signal`.
 
 Note: `docker exec` doesn't inherit the image's `PATH`. Use:
 ```bash

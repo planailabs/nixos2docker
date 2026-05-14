@@ -61,7 +61,6 @@ in
         "--tmpfs /run --tmpfs /run/lock --tmpfs /tmp "
         "--cgroupns=host "
         "-v /sys/fs/cgroup:/sys/fs/cgroup:rw "
-        "--stop-signal SIGRTMIN+3 "
         "-p 8080:80 "
         "nixos-nginx-test:latest"
     )
