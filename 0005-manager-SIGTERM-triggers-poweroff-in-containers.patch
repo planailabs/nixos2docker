@@ -1,6 +1,6 @@
---- a/src/core/manager.c	2026-05-15 01:42:53.021870998 +0200
-+++ b/src/core/manager.c	2026-05-15 01:42:53.072344407 +0200
-@@ -2979,8 +2979,16 @@
+--- a/src/core/manager.c
++++ b/src/core/manager.c
+@@ -3128,8 +3128,16 @@ static int manager_dispatch_signal_fd(sd
  
          case SIGTERM:
                  if (MANAGER_IS_SYSTEM(m)) {

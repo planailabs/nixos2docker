@@ -1,6 +1,6 @@
---- a/src/core/exec-invoke.c	2026-05-15 00:27:05.176841480 +0200
-+++ b/src/core/exec-invoke.c	2026-05-15 00:27:05.221836486 +0200
-@@ -3240,8 +3240,10 @@
+--- a/src/core/exec-invoke.c
++++ b/src/core/exec-invoke.c
+@@ -3268,8 +3268,10 @@ static int setup_exec_directory(
                                  goto fail;
                  }
  

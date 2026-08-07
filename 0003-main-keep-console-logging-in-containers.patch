@@ -1,6 +1,6 @@
---- a/src/core/main.c	2026-05-14 23:28:24.569129571 +0200
-+++ b/src/core/main.c	2026-05-14 23:28:24.616648729 +0200
-@@ -3156,8 +3156,9 @@
+--- a/src/core/main.c
++++ b/src/core/main.c
+@@ -3558,8 +3558,9 @@ int main(int argc, char *argv[]) {
                          /* Running inside a container, as PID 1 */
                          log_set_target_and_open(LOG_TARGET_CONSOLE);
  
@@ -12,7 +12,7 @@
  
                          /* clear the kernel timestamp, because we are in a container */
                          kernel_timestamp = DUAL_TIMESTAMP_NULL;
-@@ -3178,9 +3179,11 @@
+@@ -3580,9 +3581,11 @@ int main(int argc, char *argv[]) {
                   * instances since they never log into the console. */
                  log_show_color(colors_enabled());
  
@@ -27,15 +27,17 @@
  
                  /* Load the kernel modules early. */
                  if (!skip_setup)
-@@ -3199,7 +3202,10 @@
-                 /* Running as user instance */
-                 arg_runtime_scope = RUNTIME_SCOPE_USER;
-                 log_set_always_reopen_console(true);
--                log_set_target_and_open(LOG_TARGET_AUTO);
-+                if (detect_container() > 0)
-+                        log_set_target_and_open(LOG_TARGET_CONSOLE);
-+                else
-+                        log_set_target_and_open(LOG_TARGET_AUTO);
+@@ -3607,7 +3610,12 @@ int main(int argc, char *argv[]) {
  
-                 /* clear the kernel timestamp, because we are not PID 1 */
-                 kernel_timestamp = DUAL_TIMESTAMP_NULL;
+                 if (invoked_by_systemd()) {
+                         log_set_always_reopen_console(true);
+-                        log_set_target_and_open(LOG_TARGET_AUTO);
++                        /* In containers, log to the console so the container runtime
++                         * captures the output. */
++                        if (detect_container() > 0)
++                                log_set_target_and_open(LOG_TARGET_CONSOLE);
++                        else
++                                log_set_target_and_open(LOG_TARGET_AUTO);
+                 }
+ 
+                 r = mac_init();

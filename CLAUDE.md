@@ -19,6 +19,7 @@ The local test takes seconds; the VM test takes ~90s and rebuilds systemd if pat
 
 - `build-docker-image.nix` — outer module, uses `extendModules` (like `build-vm.nix`)
 - `docker-container.nix` — inner module, container tweaks + systemd patches + image build
-- `0001-*.patch` through `0004-*.patch` — systemd patches for read-only cgroup support
+- `0001-*.patch` through `0005-*.patch` — systemd patches for read-only cgroup support
+  (rebased onto systemd 261.1; regenerate against `nixpkgs#systemd.src` when nixpkgs bumps systemd)
 - `tests/docker-nginx.nix` — NixOS VM integration test
 - `test-local.sh` — fast local Docker test script

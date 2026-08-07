@@ -65,7 +65,7 @@ The `extendModules` call creates a **separate NixOS evaluation** that inherits y
 
 ### systemd patches
 
-systemd 260 hard-crashes in containers with read-only cgroup filesystems (the default in Docker). This project includes four patches applied via a nixpkgs overlay that make systemd gracefully degrade instead:
+systemd hard-crashes in containers with read-only cgroup filesystems (the default in Docker). This project includes five patches (currently rebased onto **systemd 261.1**) applied via `systemd.package` that make systemd gracefully degrade instead:
 
 | Patch | What it fixes |
 |---|---|
@@ -106,6 +106,15 @@ Additional store paths to include in the image.
 
 **Type:** `list of package`
 **Default:** `[ ]`
+
+### `virtualisation.dockerImage.includeNixDB`
+
+Register the image contents in the Nix store database so `nix` / `nix-daemon`
+work inside the container. Off by default (registering the full closure costs
+build time).
+
+**Type:** `bool`
+**Default:** `false`
 
 ### `virtualisation.dockerVariant`
 

@@ -1,6 +1,6 @@
---- a/src/shared/mount-setup.c	2026-05-14 23:05:13.188115262 +0200
-+++ b/src/shared/mount-setup.c	2026-05-14 23:05:27.966053039 +0200
-@@ -333,13 +333,17 @@
+--- a/src/shared/mount-setup.c
++++ b/src/shared/mount-setup.c
+@@ -334,13 +334,17 @@ static int mount_one(const MountPoint *p
  
          if (FLAGS_SET(p->mode, MNT_CHECK_WRITABLE))
                  if (access(p->where, W_OK) < 0) {
@@ -17,7 +17,7 @@
  
 -                        log_full_errno(priority, r, "Mount point '%s' not writable after mounting, undoing: %m", p->where);
 -                        return FLAGS_SET(p->mode, MNT_FATAL) ? r : 0;
-+                                log_full_errno(priority, r, "Mount point '%s' not writable after mounting, undoing: %%m", p->where);
++                                log_full_errno(priority, r, "Mount point '%s' not writable after mounting, undoing: %m", p->where);
 +                                return FLAGS_SET(p->mode, MNT_FATAL) ? r : 0;
 +                        }
                  }
