@@ -148,6 +148,8 @@ The container module applies the following, modelled on how Incus/LXD and system
 
 **Environment:** `container=docker` set so systemd auto-detects the container runtime and skips hardware init.
 
+**Exposed ports:** the image's `ExposedPorts` are derived from `networking.firewall.allowedTCPPorts` / `allowedUDPPorts`, so a service enabled with `openFirewall` (the default for sshd, nginx, ...) shows up on the image even though the firewall itself is off. Port ranges are not expanded.
+
 **Stop signal:** SIGTERM triggers clean shutdown via the manager patch (stock systemd requires the non-standard `SIGRTMIN+3`; our patch maps SIGTERM to `poweroff.target` in containers).
 
 ## Docker run flags

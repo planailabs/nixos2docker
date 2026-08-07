@@ -318,6 +318,15 @@ EOF
         "/run/lock"      = { };
         "/tmp"           = { };
       };
+      # Derived from the firewall lists — services that open a port with
+      # `openFirewall` (sshd, nginx, ...) get it declared on the image, so
+      # `docker run -P` and registry UIs see the right ports.  Port *ranges*
+      # are skipped on purpose; declare those via networking.firewall
+      # .allowedTCPPorts if you want them exposed.
+      ExposedPorts = lib.listToAttrs (
+        map (p: lib.nameValuePair "${toString p}/tcp" { }) config.networking.firewall.allowedTCPPorts
+        ++ map (p: lib.nameValuePair "${toString p}/udp" { }) config.networking.firewall.allowedUDPPorts
+      );
       Labels = {
         "org.nixos.systemd-container" = "true";
       };
