@@ -127,6 +127,16 @@ in
     where = "/run/wrappers";
     enable = false;
   }];
+
+  # ...but nixpkgs' pam_unix hardcodes /run/wrappers/bin/unix_chkpwd, and
+  # without it *every* PAM account check returns PAM_AUTHINFO_UNAVAIL — sshd
+  # then rejects every login with "Access denied by PAM account
+  # configuration".  A plain symlink into the /run tmpfs is enough for root
+  # (the helper reads /etc/shadow directly when euid is 0); non-root password
+  # auth would still need the setuid bit, which no wrapper can provide here.
+  systemd.tmpfiles.rules = [
+    "L+ /run/wrappers/bin/unix_chkpwd - - - - ${config.security.pam.package}/bin/unix_chkpwd"
+  ];
   services.journald.storage = "volatile";
   services.journald.console = "/dev/console";
   services.journald.extraConfig = ''

@@ -20,7 +20,6 @@ docker load < result
 echo "==> Starting container (NO extra capabilities)..."
 docker run -d --name "$CONTAINER_NAME" \
   --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
-  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
   -p 18080:80 \
   "$IMAGE_NAME:latest"
 
@@ -29,7 +28,8 @@ state="unknown"
 for i in $(seq 1 30); do
   state=$(docker exec -e PATH="$NIXPATH" "$CONTAINER_NAME" systemctl is-system-running 2>/dev/null || true)
   echo "  [$i] systemd state: $state"
-  if [[ "$state" == "running" || "$state" == "degraded" ]]; then
+  # "degraded" can be a transient mid-boot state — only stop on a settled system.
+  if [[ "$state" == "running" ]]; then
     break
   fi
   sleep 1
