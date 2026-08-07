@@ -239,6 +239,7 @@ in
     name     = imgCfg.name;
     tag      = imgCfg.tag;
     maxLayers = imgCfg.maxLayers;
+    includeNixDB = imgCfg.includeNixDB;
 
     contents = [
       toplevel

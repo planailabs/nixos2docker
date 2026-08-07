@@ -88,6 +88,16 @@ in
         default = [ ];
         description = "Additional store paths to include in the image.";
       };
+
+      includeNixDB = mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Register the image contents in the Nix store database, so `nix` and
+          `nix-daemon` work inside the container.  Adds build time (the whole
+          closure is registered), so it is off by default.
+        '';
+      };
     };
   };
 
