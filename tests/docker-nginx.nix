@@ -86,6 +86,22 @@ in
         "${exec} systemctl is-active nginx.service"
     )
 
+    # `docker logs` must carry systemd's own output.  The container has no
+    # TTY, so Docker never creates /dev/console — without the log.c fallback
+    # patch systemd writes into a device that isn't there and the log is empty.
+    machine.wait_until_succeeds(
+        "docker logs nixos-test 2>&1 | grep -q 'Reached target'",
+        timeout=60,
+    )
+
+    # Service output only gets there through the journal forwarder.
+    machine.succeed("${exec} systemctl is-active docker-journal-forward.service")
+    machine.succeed("${exec} systemd-cat -t logtest echo nixos2docker-log-marker")
+    machine.wait_until_succeeds(
+        "docker logs nixos-test 2>&1 | grep -q nixos2docker-log-marker",
+        timeout=30,
+    )
+
     # Verify nginx responds with the expected content
     machine.wait_until_succeeds(
         "curl -sf http://localhost:8080/ | grep -q nixos2docker-ok",

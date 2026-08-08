@@ -32,6 +32,7 @@ in
       ./0003-main-keep-console-logging-in-containers.patch
       ./0004-exec-invoke-skip-cgroup-quotas-when-cgroup-path-null.patch
       ./0005-manager-SIGTERM-triggers-poweroff-in-containers.patch
+      ./0006-log-fall-back-to-stderr-when-console-is-missing.patch
     ];
   });
 
@@ -137,12 +138,25 @@ in
   systemd.tmpfiles.rules = [
     "L+ /run/wrappers/bin/unix_chkpwd - - - - ${config.security.pam.package}/bin/unix_chkpwd"
   ];
+
+  # ════════════════════════════════════════════════════════════════════
+  #  Logging — everything has to end up on PID 1's stdout
+  # ════════════════════════════════════════════════════════════════════
+
+  # `docker logs` shows one thing: whatever PID 1 writes to its stdout/stderr.
+  # Two separate streams have to get there.
+  #
+  #  1. systemd's own messages.  Docker creates /dev/console only for `-t`, and
+  #     stock systemd writes both its log and its "[  OK  ] Started ..." status
+  #     lines there and nowhere else — so everything after "starting systemd"
+  #     is silently dropped.  Patch 0006 falls back to stderr for both.
+  #
+  #  2. Service output.  Units log to the journal, and nothing inside a
+  #     container ever reads it.  journald's own ForwardToConsole is no help:
+  #     it writes to /dev/console too.  So follow the journal and copy it into
+  #     PID 1's stdout, which is the pipe the runtime captures.  That is the
+  #     docker-journal-forward unit, defined with the service list below.
   services.journald.storage = "volatile";
-  services.journald.console = "/dev/console";
-  services.journald.extraConfig = ''
-    ForwardToConsole=yes
-    MaxLevelConsole=info
-  '';
 
   # ════════════════════════════════════════════════════════════════════
   #  Networking — Docker manages the network stack
@@ -174,10 +188,9 @@ in
       requiredBy = mkForce [ ];
     };
   in builtins.listToAttrs (map mkMasked [
-    # Journald — cgroup pressure monitoring fails when the cgroup
-    # namespace doesn't match the mounted filesystem.  Disable
-    # journald; container logs go to stdout via ForwardToConsole.
-    "systemd-journald"
+    # journald itself stays enabled — it is what collects service output,
+    # which docker-journal-forward then copies to PID 1's stdout.  Flushing
+    # to /var/log/journal is pointless with storage = "volatile".
     "systemd-journal-flush"
 
     # Hardware — no devices, no kernel, no firmware
@@ -212,7 +225,28 @@ in
     "systemd-update-utmp-runlevel"
     "systemd-machine-id-commit"
     "systemd-ask-password-wall"
-  ]);
+  ]) // {
+    # Copy the journal into PID 1's stdout, the only stream `docker logs`
+    # shows.  See the logging section above for why nothing else works.
+    docker-journal-forward = {
+      description = "Forward the journal to the container runtime's stdout";
+      documentation = [ "https://systemd.io/CONTAINER_INTERFACE" ];
+      wantedBy = [ "sysinit.target" ];
+      requires = [ "systemd-journald.service" ];
+      after = [ "systemd-journald.service" ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig = {
+        # --lines=all replays what was logged before this unit started, so the
+        # early boot reaches `docker logs` too, not just everything after it.
+        ExecStart = "${config.systemd.package}/bin/journalctl --follow --lines=all --output=short-precise --no-hostname";
+        # append: bypasses the journal, so following it cannot feed itself.
+        StandardOutput = "append:/proc/1/fd/1";
+        StandardError = "journal";
+        Restart = "always";
+        RestartSec = 1;
+      };
+    };
+  };
 
   systemd.sockets = let
     mkMasked = name: lib.nameValuePair name {
@@ -222,9 +256,9 @@ in
   in builtins.listToAttrs (map mkMasked [
     "systemd-udevd-control"
     "systemd-udevd-kernel"
+    # No audit subsystem in the container; the other two journald sockets
+    # stay, they are how units hand their stdout to journald.
     "systemd-journald-audit"
-    "systemd-journald"
-    "systemd-journald-dev-log"
   ]);
 
   systemd.targets = let

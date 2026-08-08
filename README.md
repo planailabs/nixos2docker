@@ -65,7 +65,7 @@ The `extendModules` call creates a **separate NixOS evaluation** that inherits y
 
 ### systemd patches
 
-systemd hard-crashes in containers with read-only cgroup filesystems (the default in Docker). This project includes five patches (currently rebased onto **systemd 261.1**) applied via `systemd.package` that make systemd gracefully degrade instead:
+systemd hard-crashes in containers with read-only cgroup filesystems (the default in Docker). This project includes six patches (currently rebased onto **systemd 261.1**) applied via `systemd.package` that make systemd gracefully degrade instead:
 
 | Patch | What it fixes |
 |---|---|
@@ -74,6 +74,7 @@ systemd hard-crashes in containers with read-only cgroup filesystems (the defaul
 | `0003-main` | Keep stdout/stderr alive in containers (skip `make_null_stdio()`); stay on `LOG_TARGET_CONSOLE` instead of switching to journal |
 | `0004-exec-invoke` | Skip `apply_exec_quotas()` when `cgroup_path` is NULL |
 | `0005-manager` | Map SIGTERM to `poweroff.target` in containers (Docker sends SIGTERM by default; stock systemd treats it as reexec) |
+| `0006-log` | Fall back to stderr when `/dev/console` cannot be opened, in both `log_open_console()` and `status_vprintf()` — Docker creates that device only for `-t`, and stock systemd drops every message instead. The status half matters on its own: `job.c` skips the *log* message whenever it believes the console will carry it, so without it `Started foo.service` exists nowhere at all |
 
 These patches are inspired by how [Incus/LXC](https://linuxcontainers.org/incus/) runs unprivileged system containers and the approach of the [oci-systemd-hook](https://github.com/projectatomic/oci-systemd-hook).
 
@@ -138,13 +139,13 @@ The container module applies the following, modelled on how Incus/LXD and system
 
 **Services disabled via NixOS options:** `services.resolved`, `services.nscd`, `services.timesyncd`, `systemd.oomd` — all disabled with proper NixOS options rather than manual unit masking.
 
-**Masked services:** systemd-sysctl, systemd-random-seed, systemd-rfkill, systemd-hibernate-resume, systemd-tmpfiles-setup-dev, systemd-binfmt, systemd-pstore, systemd-firstboot, systemd-hwdb-update (hardware); systemd-networkd, systemd-networkd-wait-online, firewall, network-setup (networking); systemd-remount-fs, suid-sgid-wrappers (filesystem); systemd-logind, systemd-vconsole-setup, getty, serial-getty (console); systemd-journald, systemd-journal-flush (logging — console output instead); systemd-update-utmp, systemd-machine-id-commit, systemd-ask-password-wall (misc).
+**Masked services:** systemd-sysctl, systemd-random-seed, systemd-rfkill, systemd-hibernate-resume, systemd-tmpfiles-setup-dev, systemd-binfmt, systemd-pstore, systemd-firstboot, systemd-hwdb-update (hardware); systemd-networkd, systemd-networkd-wait-online, firewall, network-setup (networking); systemd-remount-fs, suid-sgid-wrappers (filesystem); systemd-logind, systemd-vconsole-setup, getty, serial-getty (console); systemd-journal-flush (logging — the journal stays volatile); systemd-update-utmp, systemd-machine-id-commit, systemd-ask-password-wall (misc).
 
 **Cgroups:** `DisableControllers` on the root slice prevents systemd from enabling controllers it can't manage. `SYSTEMD_SECCOMP=0` disables seccomp sandboxing (the kernel's container namespaces provide isolation).
 
 **Networking:** DHCP, networkd, firewall all disabled — Docker manages networking.
 
-**Journald:** Disabled (masked). Container logs go to stdout/stderr via the console logging patch, captured by `docker logs`.
+**Journald:** Enabled, `Storage=volatile` (flushing to `/var/log/journal` is masked). `journalctl` works inside the container, and the `docker-journal-forward` unit follows the journal into PID 1's stdout so service output reaches `docker logs`. systemd's own messages get there directly: patch `0006` makes it log to the inherited stderr when `/dev/console` is absent. journald's own `ForwardToConsole` is not used — it writes to `/dev/console`, which Docker only creates for `-t`.
 
 **Environment:** `container=docker` set so systemd auto-detects the container runtime and skips hardware init.
 

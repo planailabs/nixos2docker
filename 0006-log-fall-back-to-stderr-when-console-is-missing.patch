@@ -1,0 +1,51 @@
+--- a/src/basic/log.c
++++ b/src/basic/log.c
+@@ -105,8 +105,16 @@ static int log_open_console(void) {
+                 int fd;
+ 
+                 fd = open_terminal("/dev/console", O_WRONLY|O_NOCTTY|O_CLOEXEC);
+-                if (fd < 0)
+-                        return fd;
++                if (fd < 0) {
++                        /* A container runtime need not provide /dev/console at all: Docker creates
++                         * it only when a TTY is allocated. Reopening it then fails and every
++                         * message is thrown away — including the ones explaining why the boot went
++                         * wrong. Fall back to the stderr we inherited instead; inside a container
++                         * that is the pipe the runtime captures as the container's log. */
++                        console_fd = STDERR_FILENO;
++                        console_fd_is_tty = -1;
++                        return 0;
++                }
+ 
+                 console_fd = fd_move_above_stdio(fd);
+                 console_fd_is_tty = true;
+--- a/src/core/show-status.c
++++ b/src/core/show-status.c
+@@ -1,6 +1,7 @@
+ /* SPDX-License-Identifier: LGPL-2.1-or-later */
+ 
+ #include <fcntl.h>
++#include <unistd.h>
+ 
+ #include "alloc-util.h"
+ #include "fd-util.h"
+@@ -62,8 +63,17 @@ int status_vprintf(const char *status, S
+          * for us so that we don't have to recover from hangups and suchlike triggered on the console. */
+ 
+         fd = open_terminal("/dev/console", O_WRONLY|O_NOCTTY|O_CLOEXEC);
+-        if (fd < 0)
+-                return fd;
++        if (fd < 0) {
++                /* A container runtime need not provide /dev/console at all: Docker creates it only
++                 * when a TTY is allocated. Losing status messages is not harmless — job.c skips the
++                 * corresponding log message whenever it believes the console will carry it, so
++                 * "Started foo.service" would disappear entirely. Fall back to our stderr, which
++                 * inside a container is the stream the runtime captures. Dup it, so that closing
++                 * this fd per line (see above) does not close stderr itself. */
++                fd = fcntl(STDERR_FILENO, F_DUPFD_CLOEXEC, 3);
++                if (fd < 0)
++                        return -errno;
++        }
+ 
+         if (FLAGS_SET(flags, SHOW_STATUS_ELLIPSIZE) && !dumb) {
+                 char *e;
