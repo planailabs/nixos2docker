@@ -89,6 +89,20 @@ in
         description = "Additional store paths to include in the image.";
       };
 
+      extraEnv = mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        example = { NVIDIA_DRIVER_CAPABILITIES = "all"; };
+        description = ''
+          Extra variables for the image's OCI `Env`.  Container runtime hooks
+          read their configuration from there before the container exists —
+          the NVIDIA hook decides which parts of the host driver to inject
+          based on `NVIDIA_DRIVER_CAPABILITIES`, for instance.  NixOS'
+          `environment.variables` cannot express that: it only reaches
+          processes started inside the container.
+        '';
+      };
+
       includeNixDB = mkOption {
         type = lib.types.bool;
         default = false;

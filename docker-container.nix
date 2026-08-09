@@ -346,7 +346,7 @@ EOF
       Env = [
         "PATH=/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin"
         "container=docker"
-      ];
+      ] ++ lib.mapAttrsToList (n: v: "${n}=${v}") imgCfg.extraEnv;
       Volumes = {
         "/run"           = { };
         "/run/lock"      = { };

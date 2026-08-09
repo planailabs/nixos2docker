@@ -108,6 +108,22 @@ Additional store paths to include in the image.
 **Type:** `list of package`
 **Default:** `[ ]`
 
+### `virtualisation.dockerImage.extraEnv`
+
+Extra variables for the image's OCI `Env`. Container runtime hooks read their
+configuration from there before the container exists — the NVIDIA hook picks
+which parts of the host driver to inject based on
+`NVIDIA_DRIVER_CAPABILITIES`, and `compute,utility` (the default) leaves out
+the Vulkan and OpenGL libraries. `environment.variables` cannot express this:
+it only reaches processes started inside the container.
+
+**Type:** `attribute set of string`
+**Default:** `{ }`
+
+```nix
+virtualisation.dockerImage.extraEnv.NVIDIA_DRIVER_CAPABILITIES = "all";
+```
+
 ### `virtualisation.dockerImage.includeNixDB`
 
 Register the image contents in the Nix store database so `nix` / `nix-daemon`
