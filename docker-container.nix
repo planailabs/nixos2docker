@@ -11,13 +11,26 @@
 # for delegation, set $container so systemd auto-detects its
 # environment, and disable everything that would need CAP_SYS_ADMIN.
 
-{ config, lib, pkgs, ... }:
+{ config, lib, options, pkgs, ... }:
 
 let
   inherit (lib) mkForce mkDefault;
 
   imgCfg = config.virtualisation.dockerImage;
   toplevel = config.system.build.toplevel;
+
+  # nixpkgs removed the scripted initrd, and with it the
+  # `boot.initrd.systemd.enable` option: systemd is now the only
+  # implementation. What is left is a `mkRemovedOptionModule` stub whose
+  # `apply` throws, so *any* definition of it fails the module-system
+  # assertion ("no longer has any effect; please remove it") and the image
+  # build aborts during evaluation. Probe whether the option still has a
+  # meaning and only define it where it does, so older nixpkgs pins keep
+  # selecting the systemd initrd.
+  systemdInitrdOptionLive =
+    (builtins.tryEval (builtins.seq
+      ((lib.attrByPath [ "boot" "initrd" "systemd" "enable" "apply" ] (_: true) options) true)
+      true)).success;
 
 in
 {
@@ -43,7 +56,9 @@ in
   # boot.isContainer = true activates container-config.nix which
   # disables: kernel, modprobe, console, udev, lvm, audit.
   boot.isContainer = true;
-  boot.initrd.systemd.enable = true;
+  # Only where the option still selects an initrd implementation; see the
+  # `systemdInitrdOptionLive` probe above.
+  boot.initrd = lib.mkIf systemdInitrdOptionLive { systemd.enable = true; };
 
   # Tell NixOS that /proc, /run, /dev, /dev/shm, /dev/pts are
   # already provided by Docker — do not attempt to mount them.

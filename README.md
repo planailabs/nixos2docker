@@ -151,7 +151,7 @@ virtualisation.dockerVariant = {
 
 The container module applies the following, modelled on how Incus/LXD and systemd-nspawn configure container guests:
 
-**Boot:** `boot.isContainer = true`, `boot.initrd.systemd.enable = true`, no bootloader. `boot.specialFileSystems` cleared (Docker provides them). `boot.nixStoreMountOpts = []` (skip remount).
+**Boot:** `boot.isContainer = true`, no bootloader. `boot.initrd.systemd.enable = true` is only set on nixpkgs pins that still offer a choice of initrd implementation — newer nixpkgs removed the scripted initrd and the option with it (defining it there now trips a removed-option assertion). `boot.specialFileSystems` cleared (Docker provides them). `boot.nixStoreMountOpts = []` (skip remount).
 
 **Services disabled via NixOS options:** `services.resolved`, `services.nscd`, `services.timesyncd`, `systemd.oomd` — all disabled with proper NixOS options rather than manual unit masking.
 
